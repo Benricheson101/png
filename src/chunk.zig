@@ -8,7 +8,6 @@ const c = @cImport({
 });
 
 pub const Chunk = union {
-    /// Image header chunk
     IHDR: IHDR,
     PLTE: PLTE,
     IDAT: IDAT,
@@ -44,28 +43,22 @@ fn PNGChunk(comptime chunk_typ: [4]u8, comptime Data: type) type {
         const Self = @This();
 
         pub fn encode(self: *Self, allocator: Allocator) ![]u8 {
-            const data_length: u32 = self.data.length();
-            const buf = try allocator.alloc(u8, BASE_CHUNK_SIZE + data_length);
+            const data: []u8 = try self.data.encode(allocator);
+            defer allocator.free(data);
 
-            // pub fn encode(self: *Self, buf: []u8) !usize {
-            //     const data_length: u32 = self.data.length();
-            //     // const buf = try allocator.alloc(u8, BASE_CHUNK_SIZE + data_length);
+            const buf = try allocator.alloc(u8, data.len + BASE_CHUNK_SIZE);
             @memset(buf[0..], 0);
 
-            std.mem.writeInt(u32, buf[0..4], data_length, .big);
+            std.mem.writeInt(u32, buf[0..4], @intCast(data.len), .big);
             // TODO: should this be memmove? waht's the difference in this case
             @memcpy(buf[4..8], chunk_typ[0..4]);
 
-            try self.data.encode(buf[8 .. buf.len - 4]);
+            @memmove(buf[8 .. buf.len - 4], data[0..]);
 
             const crc = Crc32.hash(buf[4 .. buf.len - 4]);
-            // FIXME: why doesn't this one work?
-            // std.mem.writeInt(u32, buf[buf.len - 4 .. buf.len], crc, .big);
             std.mem.writePackedInt(u32, buf[buf.len - 4 ..], 0, crc, .big);
 
             return buf;
-            //
-            // return BASE_CHUNK_SIZE + data_length;
         }
     };
 }
@@ -100,7 +93,10 @@ pub const IHDRData = struct {
         return 13;
     }
 
-    fn encode(self: *IHDRData, buf: []u8) !void {
+    fn encode(self: *IHDRData, allocator: Allocator) ![]u8 {
+        var buf = try allocator.alloc(u8, 13);
+        @memset(buf[0..], 0);
+
         std.mem.writeInt(u32, buf[0..4], self.width, .big);
         std.mem.writeInt(u32, buf[4..8], self.height, .big);
         buf[8] = self.bit_depth;
@@ -108,65 +104,54 @@ pub const IHDRData = struct {
         buf[10] = self.compression_method;
         buf[11] = self.filter_method;
         buf[12] = self.interlace_method;
+
+        return buf;
     }
 };
 
 pub const PLTEData = struct {
     palette: []Color,
 
-    pub fn length(self: *PLTEData) u32 {
-        const len: u32 = @intCast(self.palette.len);
-        return len * 3;
-    }
+    fn encode(self: *PLTEData, allocator: Allocator) ![]u8 {
+        const buf = try allocator.alloc(u8, self.palette.len * 3);
+        @memset(buf[0..], 0);
 
-    fn encode(self: *PLTEData, buf: []u8) !void {
         for (self.palette, 0..) |color, i| {
             const bytes: u24 = @bitCast(color);
             std.mem.writePackedInt(u24, buf[(i * 3) .. (i * 3) + 3], 0, bytes, .big);
         }
+
+        return buf;
     }
 };
 
 pub const IENDData = struct {
-    pub fn length(_: *IENDData) u32 {
-        return 0;
+    fn encode(_: *IENDData, _: Allocator) ![]u8 {
+        return &[0]u8{};
     }
-
-    fn encode(_: *IENDData, _: []u8) !void {}
 };
 
 pub const IDATData = struct {
     image_data: []u8,
 
-    pub fn length(_: *IDATData) u32 {
-        // return @intCast(self.image_data.len);
-        return 1040;
-    }
-
-    fn encode(self: *IDATData, buf: []u8) !void {
-        const allocator = std.heap.smp_allocator;
-
+    fn encode(self: *IDATData, allocator: Allocator) ![]u8 {
         var comp_size = c.compressBound(self.image_data.len);
         var data = try allocator.alloc(u8, @intCast(comp_size));
-        defer allocator.free(data);
-
         @memset(data[0..], 0);
 
-        const df_status = c.compress(
-            data.ptr,
-            &comp_size,
-            self.image_data.ptr,
-            self.image_data.len
-        );
+        const df_status = c.compress(data.ptr, &comp_size, self.image_data.ptr, self.image_data.len);
 
         if (df_status == c.Z_BUF_ERROR) {
             @panic("image data buffer is too small");
         }
 
-        // std.debug.print("{d} -> {any}\n", .{ comp_size, data });
+        const buf = try allocator.alloc(u8, comp_size);
+        @memmove(buf[0..comp_size], data[0..comp_size]);
+        defer allocator.free(data);
+
         std.debug.print("compressed size: {d}\n", .{comp_size});
 
-        @memcpy(buf[0..comp_size], data[0..comp_size]);
+        return buf;
     }
 };
 
