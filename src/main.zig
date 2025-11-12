@@ -12,6 +12,31 @@ pub fn main() !void {
     defer png.deinit();
 
     try png.addChunk(Chunk{
+        .PLTE = .init(.{
+            .palette = &[_]Color{
+                .{ .r = 0xeb, .g = 0x4f, .b = 0x34 }, // 0: red-orange
+                .{ .r = 0x00, .g = 0x00, .b = 0x00 }, // 1: black
+            },
+        }),
+    });
+
+    try png.addChunk(Chunk{
+        .IDAT = .init(.{ //
+            .image_data = &[_]u8{
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 1, 1, 0, 0, 1, 1, 1, 0,
+                0, 0, 1, 1, 1, 0, 0, 0, 1, 0,
+                0, 0, 1, 1, 1, 0, 0, 0, 1, 0,
+                0, 0, 0, 0, 0, 0, 1, 1, 1, 0,
+                0, 0, 1, 1, 0, 0, 0, 0, 1, 0,
+                0, 0, 1, 1, 1, 0, 0, 0, 1, 0,
+                0, 0, 1, 1, 1, 0, 1, 1, 1, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            },
+        }),
+    });
+
+    try png.addChunk(Chunk{
         .tEXt = .init(.{ //
             .keyword = "Title",
             .str = "rawr",
@@ -36,31 +61,6 @@ pub fn main() !void {
         .tEXt = .init(.{ //
             .keyword = "Software",
             .str = "colorpng",
-        }),
-    });
-
-    try png.addChunk(Chunk{
-        .PLTE = .init(.{
-            .palette = &[_]Color{
-                .{ .r = 0xeb, .g = 0x4f, .b = 0x34 }, // 0: red-orange
-                .{ .r = 0x00, .g = 0x00, .b = 0x00 }, // 1: black
-            },
-        }),
-    });
-
-    try png.addChunk(Chunk{
-        .IDAT = .init(.{ //
-            .image_data = &[_]u8{
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 1, 1, 0, 0, 1, 1, 1, 0,
-                0, 0, 1, 1, 1, 0, 0, 0, 1, 0,
-                0, 0, 1, 1, 1, 0, 0, 0, 1, 0,
-                0, 0, 0, 0, 0, 0, 1, 1, 1, 0,
-                0, 0, 1, 1, 0, 0, 0, 0, 1, 0,
-                0, 0, 1, 1, 1, 0, 0, 0, 1, 0,
-                0, 0, 1, 1, 1, 0, 1, 1, 1, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            },
         }),
     });
 

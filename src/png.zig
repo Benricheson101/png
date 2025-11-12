@@ -46,10 +46,9 @@ pub const PNG = struct {
         var chunks = try self.allocator.alloc([]u8, self.chunks.items.len + 1);
         defer self.allocator.free(chunks);
 
-        var image_size: usize = 8 + 12;
-
         sortChunks(self.chunks.items);
 
+        var image_size: usize = 8 + 12;
         var chunks_added: usize = 0;
         lop: for (self.chunks.items, 0..) |c, i| {
             const buf = switch (c) {
@@ -57,14 +56,9 @@ pub const PNG = struct {
                 .PLTE => |v| try v.encode(arena_alloc),
                 .IDAT => |v| try v.encode(arena_alloc),
                 .tEXt => |v| try v.encode(arena_alloc),
-                .IEND => |_| break :lop,
+                .iTXt => |v| try v.encode(arena_alloc),
+                .IEND => |_| break :lop, // TODO: should this keep going? maybe just skip this one?
             };
-
-            // TODO: should i add basic validation?
-            // TODO: should i perform chunk ordering? http://www.libpng.org/pub/png/spec/1.2/PNG-Chunks.html#C.Summary-of-standard-chunks
-            if (c == .IHDR and i != 0) {
-                return error.IHDRNotFirst;
-            }
 
             chunks[i] = buf;
             chunks_added += 1;

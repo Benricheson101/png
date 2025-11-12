@@ -13,7 +13,7 @@ pub const ChunkType = enum(u8) {
     IHDR,
     // zTXt,
     tEXt,
-    // iTXt,
+    iTXt,
     // tIME,
     // sPLT,
     // pHYS,
@@ -34,6 +34,7 @@ pub const ChunkType = enum(u8) {
 pub const Chunk = union(ChunkType) {
     IHDR: IHDR,
     tEXt: tEXt,
+    iTXt: iTXt,
     PLTE: PLTE,
     IDAT: IDAT,
     IEND: IEND,
@@ -51,6 +52,7 @@ pub const PLTE = PNGChunk(.{ 'P', 'L', 'T', 'E' }, PLTEData);
 pub const IEND = PNGChunk(.{ 'I', 'E', 'N', 'D' }, IENDData);
 pub const IDAT = PNGChunk(.{ 'I', 'D', 'A', 'T' }, IDATData);
 pub const tEXt = PNGChunk(.{ 't', 'E', 'X', 't' }, TEXTData);
+pub const iTXt = PNGChunk(.{ 'i', 'T', 'X', 't' }, ITXTData);
 
 /// A generic PNG chunk
 ///
@@ -213,6 +215,31 @@ pub const ITXTData = struct {
     translated_keyword: []const u8,
     /// utf-8 text
     text: []const u8,
+
+    fn encode(self: *const ITXTData, allocator: Allocator) ![]u8 {
+        const len = self.keyword.len + self.language_tag.len + self.translated_keyword.len + self.text.len + 5;
+
+        const buf = try allocator.alloc(u8, len);
+        @memset(buf[0..], 0);
+        var written: usize = 0;
+
+        @memcpy(buf[0..self.keyword.len], self.keyword[0..]);
+        written += self.keyword.len + 1; // +1 for \0
+        buf[written] = self.compression_flag;
+        buf[written + 1] = self.compression_method;
+        written += 2;
+
+        @memcpy(buf[written .. written + self.language_tag.len], self.language_tag[0..]);
+        written += self.language_tag.len + 1;
+
+        @memcpy(buf[written .. written + self.translated_keyword.len], self.translated_keyword[0..]);
+        written += self.translated_keyword.len + 1;
+
+        // TODO: compress if compression_flag = 1
+        @memcpy(buf[written .. written + self.text.len], self.text[0..]);
+
+        return buf;
+    }
 };
 
 test "color packed struct" {
@@ -349,6 +376,43 @@ test "tEXt" {
     const gpa = dbg_alloc.allocator();
 
     const encoded_data = try text.tEXt.encode(gpa);
+    defer gpa.free(encoded_data);
+
+    try expectEqualSlices(u8, data[0..], encoded_data[0..]);
+}
+
+test "iTXt" {
+    var itxt = Chunk{
+        .iTXt = .init(.{ //
+            .keyword = "hi",
+            .compression_flag = 0,
+            .compression_method = 0,
+            .language_tag = "en-us",
+            .translated_keyword = "hi",
+            .text = "heyyy",
+        }),
+    };
+
+    const data = [_]u8{
+        0, 0, 0, 19, // length
+        'i', 'T', 'X', 't', // type
+        'h', 'i', // keyword
+        0, // null separator
+        0, // compression flag
+        0, // compression method
+        'e', 'n', '-', 'u', 's', // language tag
+        0, // null separator
+        'h', 'i', // translated keyword
+        0, // null separator
+        'h', 'e', 'y', 'y', 'y', // text
+        107, 0, 47, 125, // crc32
+    };
+
+    var dbg_alloc = std.heap.DebugAllocator(.{}){};
+    defer _ = dbg_alloc.deinit();
+    const gpa = dbg_alloc.allocator();
+
+    const encoded_data = try itxt.iTXt.encode(gpa);
     defer gpa.free(encoded_data);
 
     try expectEqualSlices(u8, data[0..], encoded_data[0..]);
