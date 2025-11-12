@@ -8,6 +8,7 @@ const c = @cImport({
     @cInclude("zlib.h");
 });
 
+// TODO: can I somehow make a "CUSTOM" type in the enum that takes any type?
 pub const Chunk = union(enum) {
     IHDR: IHDR,
     PLTE: PLTE,

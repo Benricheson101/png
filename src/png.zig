@@ -40,28 +40,38 @@ pub const PNG = struct {
 
         var image_size: usize = 8 + 12;
 
-        for (self.chunks.items, 0..) |c, i| {
+        var chunks_added: usize = 0;
+        lop: for (self.chunks.items, 0..) |c, i| {
             const buf = switch (c) {
                 .IHDR => |v| try v.encode(arena_alloc),
                 .PLTE => |v| try v.encode(arena_alloc),
-                .IEND => |v| try v.encode(arena_alloc),
                 .IDAT => |v| try v.encode(arena_alloc),
                 .tEXt => |v| try v.encode(arena_alloc),
+                .IEND => |_| break :lop,
             };
 
+            // TODO: should i add basic validation?
+            // TODO: should i perform chunk ordering? http://www.libpng.org/pub/png/spec/1.2/PNG-Chunks.html#C.Summary-of-standard-chunks
+            if (c == .IHDR and i != 0) {
+                return error.IHDRNotFirst;
+            }
+
             chunks[i] = buf;
+            chunks_added += 1;
             image_size += buf.len;
         }
 
         const iend = Chunk{ .IEND = .{ .data = .{} } };
         const iend_data = try iend.IEND.encode(arena_alloc);
-        chunks[chunks.len - 1] = iend_data;
+        chunks[chunks_added] = iend_data;
+        chunks_added += 1;
 
         var buf: []u8 = try arena_alloc.alloc(u8, image_size);
         @memcpy(buf[0..8], PNG_SIGNATURE[0..]);
 
         var offset: usize = 8;
-        for (chunks) |c| {
+        for (0..chunks_added) |i| {
+            const c = chunks[i];
             @memcpy(buf[offset .. offset + c.len], c[0..]);
             offset += c.len;
         }
@@ -75,6 +85,47 @@ pub const PNG = struct {
 };
 
 test "empty png" {
+    var dbg_alloc = std.heap.DebugAllocator(.{}){};
+    defer _ = dbg_alloc.deinit();
+    const gpa = dbg_alloc.allocator();
+
+    var png = try PNG.init(gpa, .{
+        .width = 16,
+        .height = 16,
+    });
+    defer png.deinit();
+
+    try png.addChunk(Chunk{
+        .IEND = .init(.{}),
+    });
+
+    const data = try png.encode();
+
+    const ihdr_chunk = [_]u8{
+        0, 0, 0, 13, // length
+        'I', 'H', 'D', 'R', // type
+        0, 0, 0, 16, // width
+        0, 0, 0, 16, // height
+        8, // bit depth
+        3, // color type
+        0, // compression method
+        0, // filter method
+        0, // interlace method
+        40, 45, 15, 83, // crc32
+    };
+
+    const iend_chunk = [_]u8{
+        0, 0, 0, 0, // length
+        'I', 'E', 'N', 'D', // type
+        174, 66, 96, 130, // crc32
+    };
+
+    const expected_data = PNG_SIGNATURE ++ ihdr_chunk ++ iend_chunk;
+
+    try std.testing.expectEqualSlices(u8, expected_data[0..], data[0..]);
+}
+
+test "only one IEND chunk" {
     var dbg_alloc = std.heap.DebugAllocator(.{}){};
     defer _ = dbg_alloc.deinit();
     const gpa = dbg_alloc.allocator();

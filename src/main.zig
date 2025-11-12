@@ -12,6 +12,34 @@ pub fn main() !void {
     defer png.deinit();
 
     try png.addChunk(Chunk{
+        .tEXt = .init(.{ //
+            .keyword = "Title",
+            .str = "rawr",
+        }),
+    });
+
+    try png.addChunk(Chunk{
+        .tEXt = .init(.{ //
+            .keyword = "Author",
+            .str = "Ben",
+        }),
+    });
+
+    try png.addChunk(Chunk{
+        .tEXt = .init(.{ //
+            .keyword = "Description",
+            .str = ":3",
+        }),
+    });
+
+    try png.addChunk(Chunk{
+        .tEXt = .init(.{ //
+            .keyword = "Software",
+            .str = "colorpng",
+        }),
+    });
+
+    try png.addChunk(Chunk{
         .PLTE = .init(.{
             .palette = &[_]Color{
                 .{ .r = 0xeb, .g = 0x4f, .b = 0x34 }, // 0: red-orange
@@ -33,13 +61,6 @@ pub fn main() !void {
                 0, 0, 1, 1, 1, 0, 1, 1, 1, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             },
-        }),
-    });
-
-    try png.addChunk(Chunk{
-        .tEXt = .init(.{ //
-            .keyword = "owo",
-            .str = ":3",
         }),
     });
 
