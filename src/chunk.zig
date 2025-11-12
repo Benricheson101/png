@@ -22,12 +22,10 @@ pub const Color = packed struct(u24) {
     r: u8,
 };
 
-// pub const IHDR = PNGChunk(.{ 73, 72, 68, 82 }, IHDRData);
-
 pub const IHDR = PNGChunk(.{ 'I', 'H', 'D', 'R' }, IHDRData);
 pub const PLTE = PNGChunk(.{ 'P', 'L', 'T', 'E' }, PLTEData);
-pub const IEND = PNGChunk(.{ 73, 69, 78, 68 }, IENDData);
-pub const IDAT = PNGChunk(.{ 73, 68, 65, 84 }, IDATData);
+pub const IEND = PNGChunk(.{ 'I', 'E', 'N', 'D' }, IENDData);
+pub const IDAT = PNGChunk(.{ 'I', 'D', 'A', 'T' }, IDATData);
 
 /// A generic PNG chunk
 ///
