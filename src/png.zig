@@ -8,6 +8,14 @@ const ChunkArray = std.ArrayList(Chunk);
 
 pub const PNG_SIGNATURE = [_]u8{ 137, 80, 78, 71, 13, 10, 26, 10 };
 
+fn sortChunks(chunks: []Chunk) void {
+    std.mem.sort(Chunk, chunks[0..], {}, struct {
+        fn sort(_: void, a: Chunk, b: Chunk) bool {
+            return @intFromEnum(a) < @intFromEnum(b);
+        }
+    }.sort);
+}
+
 pub const PNG = struct {
     chunks: ChunkArray,
     allocator: Allocator,
@@ -39,6 +47,8 @@ pub const PNG = struct {
         defer self.allocator.free(chunks);
 
         var image_size: usize = 8 + 12;
+
+        sortChunks(self.chunks.items);
 
         var chunks_added: usize = 0;
         lop: for (self.chunks.items, 0..) |c, i| {
@@ -160,4 +170,22 @@ test "only one IEND chunk" {
     const expected_data = PNG_SIGNATURE ++ ihdr_chunk ++ iend_chunk;
 
     try std.testing.expectEqualSlices(u8, expected_data[0..], data[0..]);
+}
+
+test "chunk sort" {
+    var chunks = [_]Chunk{
+        .{ .IHDR = .init(.{ .width = 32, .height = 32 }) },
+        .{ .IEND = .init(.{}) },
+        .{ .IDAT = .init(.{ .image_data = &[0]u8{} }) },
+        .{ .PLTE = .init(.{ .palette = &[0]chunk.Color{} }) },
+    };
+
+    sortChunks(&chunks);
+
+    const expected_order = [_]chunk.ChunkType{ .IHDR, .PLTE, .IDAT, .IEND };
+
+    for (chunks, 0..) |c, i| {
+        const tag: chunk.ChunkType = std.meta.activeTag(c);
+        try std.testing.expectEqual(tag, expected_order[i]);
+    }
 }

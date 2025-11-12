@@ -8,13 +8,35 @@ const c = @cImport({
     @cInclude("zlib.h");
 });
 
+// order is important here!
+pub const ChunkType = enum(u8) {
+    IHDR,
+    // zTXt,
+    tEXt,
+    // iTXt,
+    // tIME,
+    // sPLT,
+    // pHYS,
+    // sRGB,
+    // sBIT,
+    // iCCP,
+    // gAMA,
+    // cHRM,
+    PLTE,
+    // tRNS,
+    // hIST,
+    // bKGD,
+    IDAT,
+    IEND,
+};
+
 // TODO: can I somehow make a "CUSTOM" type in the enum that takes any type?
-pub const Chunk = union(enum) {
+pub const Chunk = union(ChunkType) {
     IHDR: IHDR,
+    tEXt: tEXt,
     PLTE: PLTE,
     IDAT: IDAT,
     IEND: IEND,
-    tEXt: tEXt,
 };
 
 // for some reason the backing integer has struct fields in reverse order
@@ -178,6 +200,19 @@ pub const TEXTData = struct {
         @memcpy(buf[self.keyword.len + 1 .. len], self.str[0..self.str.len]);
         return buf;
     }
+};
+
+pub const ITXTData = struct {
+    keyword: []const u8,
+    /// 0=uncompressed, 1=compressed
+    compression_flag: u8,
+    /// 0=uncompressed or zlib
+    compression_method: u8,
+    language_tag: []const u8,
+    /// translation of [keyword] in [language_tag]
+    translated_keyword: []const u8,
+    /// utf-8 text
+    text: []const u8,
 };
 
 test "color packed struct" {
