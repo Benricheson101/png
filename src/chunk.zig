@@ -7,7 +7,7 @@ const c = @cImport({
     @cInclude("zlib.h");
 });
 
-pub const Chunk = union {
+pub const Chunk = union(enum) {
     IHDR: IHDR,
     PLTE: PLTE,
     IDAT: IDAT,
@@ -42,7 +42,7 @@ fn PNGChunk(comptime chunk_typ: [4]u8, comptime Data: type) type {
 
         const Self = @This();
 
-        pub fn encode(self: *Self, allocator: Allocator) ![]u8 {
+        pub fn encode(self: *const Self, allocator: Allocator) ![]u8 {
             const data: []u8 = try self.data.encode(allocator);
             defer allocator.free(data);
 
@@ -82,18 +82,18 @@ pub const IHDRData = struct {
     /// height of the image
     height: u32,
     /// number of bits per sample (r/g/b) or per palette index (not per pixel). one of: 1, 2, 4, 8, 16
-    bit_depth: u8,
-    color_type: ColorType,
+    bit_depth: u8 = 8,
+    color_type: ColorType = ColorType.Indexed,
     /// 0: deflate/inflate
-    compression_method: u8,
-    filter_method: u8,
-    interlace_method: u8,
+    compression_method: u8 = 0,
+    filter_method: u8 = 0,
+    interlace_method: u8 = 0,
 
     pub fn length(_: *IHDRData) u32 {
         return 13;
     }
 
-    fn encode(self: *IHDRData, allocator: Allocator) ![]u8 {
+    fn encode(self: *const IHDRData, allocator: Allocator) ![]u8 {
         var buf = try allocator.alloc(u8, 13);
         @memset(buf[0..], 0);
 
@@ -110,9 +110,9 @@ pub const IHDRData = struct {
 };
 
 pub const PLTEData = struct {
-    palette: []Color,
+    palette: []const Color,
 
-    fn encode(self: *PLTEData, allocator: Allocator) ![]u8 {
+    fn encode(self: *const PLTEData, allocator: Allocator) ![]u8 {
         const buf = try allocator.alloc(u8, self.palette.len * 3);
         @memset(buf[0..], 0);
 
@@ -126,20 +126,26 @@ pub const PLTEData = struct {
 };
 
 pub const IENDData = struct {
-    fn encode(_: *IENDData, _: Allocator) ![]u8 {
+    fn encode(_: *const IENDData, _: Allocator) ![]u8 {
         return &[0]u8{};
     }
 };
 
 pub const IDATData = struct {
-    image_data: []u8,
+    image_data: []const u8,
 
-    fn encode(self: *IDATData, allocator: Allocator) ![]u8 {
+    fn encode(self: *const IDATData, allocator: Allocator) ![]u8 {
         var comp_size = c.compressBound(self.image_data.len);
+
         var data = try allocator.alloc(u8, @intCast(comp_size));
         @memset(data[0..], 0);
 
-        const df_status = c.compress(data.ptr, &comp_size, self.image_data.ptr, self.image_data.len);
+        const df_status = c.compress(
+            data.ptr,
+            &comp_size,
+            self.image_data.ptr,
+            self.image_data.len,
+        );
 
         if (df_status == c.Z_BUF_ERROR) {
             @panic("image data buffer is too small");
@@ -148,8 +154,6 @@ pub const IDATData = struct {
         const buf = try allocator.alloc(u8, comp_size);
         @memmove(buf[0..comp_size], data[0..comp_size]);
         defer allocator.free(data);
-
-        std.debug.print("compressed size: {d}\n", .{comp_size});
 
         return buf;
     }
