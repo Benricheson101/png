@@ -85,7 +85,7 @@ pub fn build(b: *std.Build) void {
     });
 
     exe.addIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
-    exe.root_module.linkSystemLibrary("zlib", .{});
+    mod.linkSystemLibrary("zlib", .{});
 
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default

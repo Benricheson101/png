@@ -8,7 +8,7 @@ const PNG = colorpng.png.PNG;
 pub fn main() !void {
     const allocator = std.heap.smp_allocator;
 
-    var png = try PNG.init(allocator, .{ .width = 8, .height = 8 });
+    var png = try PNG.init(allocator, .{ .width = 9, .height = 9 });
     defer png.deinit();
 
     try png.addChunk(Chunk{
@@ -24,16 +24,17 @@ pub fn main() !void {
 
     try png.addChunk(Chunk{
         .IDAT = .{
-            .data = .{ //
+            .data = .{ // :3
                 .image_data = &[_]u8{
-                    0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 1, 1, 0, 0, 1, 1, 0,
-                    0, 0, 1, 1, 0, 0, 1, 1, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 1, 1, 0, 0, 1, 1, 0,
-                    0, 0, 1, 1, 1, 1, 1, 1, 0,
-                    0, 0, 1, 1, 1, 1, 1, 1, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 1, 1, 0, 0, 1, 1, 1, 0,
+                    0, 0, 1, 1, 1, 0, 0, 0, 1, 0,
+                    0, 0, 1, 1, 1, 0, 0, 0, 1, 0,
+                    0, 0, 0, 0, 0, 0, 1, 1, 1, 0,
+                    0, 0, 1, 1, 0, 0, 0, 0, 1, 0,
+                    0, 0, 1, 1, 1, 0, 0, 0, 1, 0,
+                    0, 0, 1, 1, 1, 0, 1, 1, 1, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 },
             },
         },

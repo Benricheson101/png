@@ -14,13 +14,6 @@ pub const Chunk = union(enum) {
     IEND: IEND,
 };
 
-pub const IHDR = PNGChunk(.{ 73, 72, 68, 82 }, IHDRData);
-pub const PLTE = PNGChunk(.{ 80, 76, 84, 69 }, PLTEData);
-pub const IEND = PNGChunk(.{ 73, 69, 78, 68 }, IENDData);
-pub const IDAT = PNGChunk(.{ 73, 68, 65, 84 }, IDATData);
-
-// TODO: does this have anything to do with endianess? the docs make it look like it may but someone on reddit said that was a mistake
-
 // for some reason the backing integer has struct fields in reverse order
 pub const Color = packed struct(u24) {
     b: u8,
@@ -28,13 +21,18 @@ pub const Color = packed struct(u24) {
     r: u8,
 };
 
+pub const IHDR = PNGChunk(.{ 73, 72, 68, 82 }, IHDRData);
+pub const PLTE = PNGChunk(.{ 80, 76, 84, 69 }, PLTEData);
+pub const IEND = PNGChunk(.{ 73, 69, 78, 68 }, IENDData);
+pub const IDAT = PNGChunk(.{ 73, 68, 65, 84 }, IDATData);
+
 /// A generic PNG chunk
 ///
 /// 4 bytes: data length
 /// 4 bytes: chunk type
 /// ? bytes: data
 /// 4 bytes: crc32
-fn PNGChunk(comptime chunk_typ: [4]u8, comptime Data: type) type {
+fn PNGChunk(comptime chunk_type: [4]u8, comptime Data: type) type {
     const BASE_CHUNK_SIZE: usize = 12;
 
     return struct {
@@ -50,8 +48,7 @@ fn PNGChunk(comptime chunk_typ: [4]u8, comptime Data: type) type {
             @memset(buf[0..], 0);
 
             std.mem.writeInt(u32, buf[0..4], @intCast(data.len), .big);
-            // TODO: should this be memmove? waht's the difference in this case
-            @memcpy(buf[4..8], chunk_typ[0..4]);
+            @memcpy(buf[4..8], chunk_type[0..4]);
 
             @memmove(buf[8 .. buf.len - 4], data[0..]);
 
@@ -164,4 +161,7 @@ test "color packed struct" {
 
     const as_int: u24 = @bitCast(color);
     try std.testing.expectEqual(as_int, 0x9c9cfc);
+
+    const new_color: Color = @bitCast(as_int);
+    try std.testing.expectEqual(new_color, Color{.r = 0x9c, .g =0x9c, .b = 0xfc});
 }
