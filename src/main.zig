@@ -41,7 +41,6 @@ pub fn main() !void {
     });
 
     const encoded = try png.encode();
-    defer allocator.free(encoded);
 
     try std.fs.cwd().writeFile(.{
         .data = encoded[0..],

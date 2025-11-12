@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Crc32 = std.hash.Crc32;
 const zstd = std.compress.zstd;
+const expectEqualSlices = std.testing.expectEqualSlices;
 
 const c = @cImport({
     @cInclude("zlib.h");
@@ -21,8 +22,10 @@ pub const Color = packed struct(u24) {
     r: u8,
 };
 
-pub const IHDR = PNGChunk(.{ 73, 72, 68, 82 }, IHDRData);
-pub const PLTE = PNGChunk(.{ 80, 76, 84, 69 }, PLTEData);
+// pub const IHDR = PNGChunk(.{ 73, 72, 68, 82 }, IHDRData);
+
+pub const IHDR = PNGChunk(.{ 'I', 'H', 'D', 'R' }, IHDRData);
+pub const PLTE = PNGChunk(.{ 'P', 'L', 'T', 'E' }, PLTEData);
 pub const IEND = PNGChunk(.{ 73, 69, 78, 68 }, IENDData);
 pub const IDAT = PNGChunk(.{ 73, 68, 65, 84 }, IDATData);
 
@@ -39,6 +42,12 @@ fn PNGChunk(comptime chunk_type: [4]u8, comptime Data: type) type {
         data: Data,
 
         const Self = @This();
+
+        pub fn init(data: Data) Self {
+            return Self{
+                .data = data,
+            };
+        }
 
         pub fn encode(self: *const Self, allocator: Allocator) ![]u8 {
             const data: []u8 = try self.data.encode(allocator);
@@ -62,15 +71,15 @@ fn PNGChunk(comptime chunk_type: [4]u8, comptime Data: type) type {
 
 pub const ColorType = enum(u8) {
     /// allowed bit depths: 1, 2, 4, 8, 16
-    Grayscale = 0,
+    grayscale = 0,
     /// allowed bit depths: 8, 16
-    True = 2,
+    truecolor = 2,
     /// allowed bit depths: 1, 2, 4, 8
-    Indexed = 3,
+    indexed = 3,
     /// allowed bit depths: 8, 16
-    GrayscaleAlpha = 4,
+    grayscale_alpha = 4,
     /// allowed bit depths: 8, 16
-    TrueAlpha = 6,
+    truecolor_alpha = 6,
 };
 
 pub const IHDRData = struct {
@@ -80,7 +89,7 @@ pub const IHDRData = struct {
     height: u32,
     /// number of bits per sample (r/g/b) or per palette index (not per pixel). one of: 1, 2, 4, 8, 16
     bit_depth: u8 = 8,
-    color_type: ColorType = ColorType.Indexed,
+    color_type: ColorType = .indexed,
     /// 0: deflate/inflate
     compression_method: u8 = 0,
     filter_method: u8 = 0,
@@ -163,5 +172,107 @@ test "color packed struct" {
     try std.testing.expectEqual(as_int, 0x9c9cfc);
 
     const new_color: Color = @bitCast(as_int);
-    try std.testing.expectEqual(new_color, Color{.r = 0x9c, .g =0x9c, .b = 0xfc});
+    try std.testing.expectEqual(new_color, Color{ .r = 0x9c, .g = 0x9c, .b = 0xfc });
+}
+
+test "IHDR" {
+    var hdr = Chunk{
+        .IHDR = .init(.{ //
+            .width = 16,
+            .height = 16,
+            .bit_depth = 8,
+            .color_type = .indexed,
+            .compression_method = 0,
+            .filter_method = 0,
+            .interlace_method = 0,
+        }),
+    };
+
+    const data = [_]u8{
+        0, 0, 0, 13, // length
+        'I', 'H', 'D', 'R', // type
+        0, 0, 0, 16, // width
+        0, 0, 0, 16, // height
+        8, // bit depth
+        3, // color type
+        0, // compression method
+        0, // filter method
+        0, // interlace method
+        40, 45, 15, 83, // crc32
+    };
+
+    var dbg_alloc = std.heap.DebugAllocator(.{}){};
+    defer _ = dbg_alloc.deinit();
+    var gpa = dbg_alloc.allocator();
+
+    const encoded_data = try hdr.IHDR.encode(gpa);
+    defer gpa.free(encoded_data);
+
+    try expectEqualSlices(u8, data[0..], encoded_data[0..]);
+}
+
+test "PLTE" {
+    var plte = Chunk{
+        .PLTE = .init(.{
+            .palette = &[_]Color{
+                .{ .r = 0xff, .g = 0x00, .b = 0xaa },
+                .{ .r = 0xcc, .g = 0xee, .b = 0x09 },
+            },
+        }),
+    };
+
+    const data = [_]u8{
+        0, 0, 0, 6, // length
+        'P', 'L', 'T', 'E', // type
+        0xff, 0, 0xaa, // palette 0
+        0xcc, 0xee, 0x09, // palette 0
+        66, 225, 226, 128, // crc32
+    };
+
+    var dbg_alloc = std.heap.DebugAllocator(.{}){};
+    defer _ = dbg_alloc.deinit();
+    const gpa = dbg_alloc.allocator();
+
+    const encoded_data = try plte.PLTE.encode(gpa);
+    defer gpa.free(encoded_data);
+
+    try expectEqualSlices(u8, data[0..], encoded_data[0..]);
+}
+
+test "IDAT" {
+    var idat = Chunk{
+        .IDAT = .init(.{
+            .image_data = &[_]u8{ 0, 1, 2, 3, 4 },
+        }),
+    };
+
+    var dbg_alloc = std.heap.DebugAllocator(.{}){};
+    defer _ = dbg_alloc.deinit();
+    const gpa = dbg_alloc.allocator();
+
+    const encoded_data = try idat.IDAT.encode(gpa);
+    defer gpa.free(encoded_data);
+
+    try expectEqualSlices(u8, "IDAT"[0..4], encoded_data[4..8]);
+}
+
+test "IEND" {
+    var iend = Chunk{
+        .IEND = .init(.{}),
+    };
+
+    const data = [_]u8{
+        0, 0, 0, 0, // length
+        'I', 'E', 'N', 'D', // type
+        174, 66, 96, 130, // crc32
+    };
+
+    var dbg_alloc = std.heap.DebugAllocator(.{}){};
+    defer _ = dbg_alloc.deinit();
+    const gpa = dbg_alloc.allocator();
+
+    const encoded_data = try iend.IEND.encode(gpa);
+    defer gpa.free(encoded_data);
+
+    try expectEqualSlices(u8, data[0..], encoded_data[0..]);
 }
