@@ -83,9 +83,6 @@ pub fn main() !void {
         }),
     });
 
-    // const str: []const u8 = "hi";
-    // std.debug.print("{x}\n", .{str[1]});
-
     // const encoded = try png.encode();
 
     // try std.fs.cwd().writeFile(.{

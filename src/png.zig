@@ -255,44 +255,44 @@ test "decode png" {
         }),
     });
 
-    // try png.addChunk(Chunk{
-    //     .tEXt = .init(.{ //
-    //         .keyword = "Title",
-    //         .str = "rawr",
-    //     }),
-    // });
+    try png.addChunk(Chunk{
+        .tEXt = .init(.{ //
+            .keyword = "Title",
+            .str = "rawr",
+        }),
+    });
 
-    // try png.addChunk(Chunk{
-    //     .tEXt = .init(.{ //
-    //         .keyword = "Author",
-    //         .str = "Ben",
-    //     }),
-    // });
+    try png.addChunk(Chunk{
+        .tEXt = .init(.{ //
+            .keyword = "Author",
+            .str = "Ben",
+        }),
+    });
 
-    // try png.addChunk(Chunk{
-    //     .tEXt = .init(.{ //
-    //         .keyword = "Software",
-    //         .str = "colorpng",
-    //     }),
-    // });
+    try png.addChunk(Chunk{
+        .tEXt = .init(.{ //
+            .keyword = "Software",
+            .str = "colorpng",
+        }),
+    });
 
-    // try png.addChunk(.{
-    //     .iTXt = .init(.{
-    //         .keyword = "Description",
-    //         .language_tag = "en",
-    //         .translated_keyword = "Description",
-    //         .text = ":3c",
-    //     }),
-    // });
+    try png.addChunk(.{
+        .iTXt = .init(.{
+            .keyword = "Description",
+            .language_tag = "en",
+            .translated_keyword = "Description",
+            .text = ":3c",
+        }),
+    });
 
-    // try png.addChunk(.{
-    //     .iTXt = .init(.{
-    //         .keyword = "Description",
-    //         .language_tag = "fr",
-    //         .translated_keyword = "oui oui",
-    //         .text = "baguette",
-    //     }),
-    // });
+    try png.addChunk(.{
+        .iTXt = .init(.{
+            .keyword = "Description",
+            .language_tag = "fr",
+            .translated_keyword = "oui oui",
+            .text = "baguette",
+        }),
+    });
 
     const data = try png.encode();
     var decoded = try PNG.decode(gpa, data[0..]);
@@ -301,45 +301,4 @@ test "decode png" {
     const enc = try decoded.encode();
 
     try std.testing.expectEqualSlices(u8, data, enc);
-
-    // var png = try PNG.init(gpa, .{
-    //     .width = 16,
-    //     .height = 16,
-    // });
-    // defer png.deinit();
-    //
-    // try png.addChunk(Chunk{
-    //     .IEND = .init(.{}),
-    // });
-    //
-    // const data = try png.encode();
-    //
-    // const decoded = try PNG.decode(gpa, data[0..]);
-    //
-    // const ihdr_chunk = [_]u8{
-    //     0, 0, 0, 13, // length
-    //     'I', 'H', 'D', 'R', // type
-    //     0, 0, 0, 16, // width
-    //     0, 0, 0, 16, // height
-    //     8, // bit depth
-    //     3, // color type
-    //     0, // compression method
-    //     0, // filter method
-    //     0, // interlace method
-    //     40, 45, 15, 83, // crc32
-    // };
-    //
-    // const iend_chunk = [_]u8{
-    //     0, 0, 0, 0, // length
-    //     'I', 'E', 'N', 'D', // type
-    //     174, 66, 96, 130, // crc32
-    // };
-    //
-    // _ = decoded;
-    // _ = ihdr_chunk;
-    // _ = iend_chunk;
-
-    // const expected_data = PNG_SIGNATURE ++ ihdr_chunk ++ iend_chunk;
-    //
-    // try std.testing.expectEqualSlices(u8, expected_data[0..], data[0..]);
 }

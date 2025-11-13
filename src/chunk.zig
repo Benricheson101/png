@@ -66,7 +66,9 @@ pub const Chunk = union(ChunkType) {
                 .PLTE => .{ .PLTE = try PLTE.decode(data, ctx, allocator) },
                 .IEND => .{ .IEND = try IEND.decode(data, ctx, allocator) },
                 .IDAT => .{ .IDAT = try IDAT.decode(data, ctx, allocator) },
-                else => return error.Unimplemented,
+                .tEXt => .{ .tEXt = try tEXt.decode(data, ctx, allocator) },
+                .iTXt => .{ .iTXt = try iTXt.decode(data, ctx, allocator) },
+                // else => return error.Unimplemented,
             };
         } else {
             return error.BadChunkType;
@@ -323,8 +325,14 @@ pub const TEXTData = struct {
         return buf;
     }
 
-    fn decode(_: []u8, _: DecoderContext, _: Allocator) !@This() {
-        unreachable;
+    fn decode(data: []u8, _: DecoderContext, _: Allocator) !@This() {
+        var keyword_len: usize = 0;
+        while (data[keyword_len] != 0) : (keyword_len += 1) {}
+
+        return TEXTData{
+            .keyword = data[0..keyword_len],
+            .str = data[keyword_len + 1 ..],
+        };
     }
 };
 
@@ -365,8 +373,39 @@ pub const ITXTData = struct {
         return buf;
     }
 
-    fn decode(_: []u8, _: DecoderContext, _: Allocator) !@This() {
-        unreachable;
+    fn decodeStr(buf: []u8) []u8 {
+        var i: usize = 0;
+        while (buf[i] != 0) : (i += 1) {}
+        return buf[0..i];
+    }
+
+    fn decode(data: []u8, _: DecoderContext, _: Allocator) !@This() {
+        var cursor: usize = 0;
+
+        const keyword = decodeStr(data[cursor..]);
+        cursor += keyword.len + 1;
+
+        const compression_flag = data[cursor];
+        cursor += 1;
+        const compression_method = data[cursor];
+        cursor += 1;
+
+        const language_tag = decodeStr(data[cursor..]);
+        cursor += language_tag.len + 1;
+
+        const translated_keyword = decodeStr(data[cursor..]);
+        cursor += translated_keyword.len + 1;
+
+        const text = data[cursor..];
+
+        return .{
+            .keyword = keyword,
+            .compression_flag = compression_flag,
+            .compression_method = compression_method,
+            .language_tag = language_tag,
+            .translated_keyword = translated_keyword,
+            .text = text,
+        };
     }
 };
 
@@ -612,6 +651,26 @@ test "tEXt encode" {
     try expectEqualSlices(u8, data[0..], encoded_data[0..]);
 }
 
+test "tEXt decode" {
+    var data = [_]u8{
+        0, 0, 0, 8, // length
+        't', 'E', 'X', 't', // type
+        'h', 'i', // keyword
+        0, // null separator
+        'h', 'e', 'l', 'l', 'o', // str
+        17, 24, 126, 143, // crc32
+    };
+
+    var dbg_alloc = std.heap.DebugAllocator(.{}){};
+    defer _ = dbg_alloc.deinit();
+    const gpa = dbg_alloc.allocator();
+
+    const chunk = try Chunk.decode(&data, .{}, gpa);
+
+    try expectEqualSlices(u8, &[_]u8{ 'h', 'i' }, chunk.tEXt.data.keyword);
+    try expectEqualSlices(u8, &[_]u8{ 'h', 'e', 'l', 'l', 'o' }, chunk.tEXt.data.str);
+}
+
 test "iTXt encode" {
     var itxt = Chunk{
         .iTXt = .init(.{ //
@@ -647,4 +706,32 @@ test "iTXt encode" {
     defer gpa.free(encoded_data);
 
     try expectEqualSlices(u8, data[0..], encoded_data[0..]);
+}
+
+test "iTXt decode" {
+    var data = [_]u8{
+        0, 0, 0, 19, // length
+        'i', 'T', 'X', 't', // type
+        'h', 'i', // keyword
+        0, // null separator
+        0, // compression flag
+        0, // compression method
+        'e', 'n', '-', 'u', 's', // language tag
+        0, // null separator
+        'h', 'i', // translated keyword
+        0, // null separator
+        'h', 'e', 'y', 'y', 'y', // text
+        107, 0, 47, 125, // crc32
+    };
+
+    var dbg_alloc = std.heap.DebugAllocator(.{}){};
+    defer _ = dbg_alloc.deinit();
+    const gpa = dbg_alloc.allocator();
+
+    const chunk = try Chunk.decode(&data, .{}, gpa);
+
+    try expectEqualSlices(u8, &[_]u8{ 'h', 'i' }, chunk.iTXt.data.keyword[0..]);
+    try expectEqualSlices(u8, &[_]u8{ 'e', 'n', '-', 'u', 's' }, chunk.iTXt.data.language_tag[0..]);
+    try expectEqualSlices(u8, &[_]u8{ 'h', 'i' }, chunk.iTXt.data.translated_keyword[0..]);
+    try expectEqualSlices(u8, &[_]u8{ 'h', 'e', 'y', 'y', 'y' }, chunk.iTXt.data.text[0..]);
 }
