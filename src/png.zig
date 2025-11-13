@@ -1,5 +1,6 @@
 const std = @import("std");
 const chunk = @import("chunk.zig");
+const color = @import("./util/color.zig");
 
 const Allocator = std.mem.Allocator;
 const Chunk = chunk.Chunk;
@@ -21,7 +22,7 @@ pub const PNG = struct {
     allocator: Allocator,
     arena: std.heap.ArenaAllocator,
 
-    pub fn init(allocator: Allocator, header: chunk.IHDRData) !PNG {
+    pub fn init(allocator: Allocator, header: chunk.ihdr.IHDRData) !PNG {
         var arena_allocator = std.heap.ArenaAllocator.init(allocator);
         const arena_alloc = arena_allocator.allocator();
 
@@ -209,7 +210,7 @@ test "chunk sort" {
         .{ .IHDR = .init(.{ .width = 32, .height = 32 }) },
         .{ .IEND = .init(.{}) },
         .{ .IDAT = .init(.{ .image_data = &[0]u8{} }) },
-        .{ .PLTE = .init(.{ .palette = &[0]chunk.Color{} }) },
+        .{ .PLTE = .init(.{ .palette = &[0]color.Color{} }) },
     };
 
     sortChunks(&chunks);
@@ -232,7 +233,7 @@ test "decode png" {
 
     try png.addChunk(Chunk{
         .PLTE = .init(.{
-            .palette = &[_]chunk.Color{
+            .palette = &[_]color.Color{
                 .{ .r = 0xeb, .g = 0x4f, .b = 0x34 }, // 0: red-orange
                 .{ .r = 0x00, .g = 0x00, .b = 0x00 }, // 1: black
             },
