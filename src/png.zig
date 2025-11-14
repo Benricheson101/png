@@ -12,7 +12,7 @@ pub const PNG_SIGNATURE = [_]u8{ 137, 80, 78, 71, 13, 10, 26, 10 };
 fn sortChunks(chunks: []Chunk) void {
     std.mem.sort(Chunk, chunks[0..], {}, struct {
         fn sort(_: void, a: Chunk, b: Chunk) bool {
-            return @intFromEnum(a) < @intFromEnum(b);
+            return @intFromEnum(a.data) < @intFromEnum(b.data);
         }
     }.sort);
 }
@@ -22,13 +22,15 @@ pub const PNG = struct {
     allocator: Allocator,
     arena: std.heap.ArenaAllocator,
 
-    pub fn init(allocator: Allocator, header: chunk.ihdr.IHDRData) !PNG {
+    pub fn init(allocator: Allocator, header: @FieldType(Chunk.ChunkData, "IHDR")) !PNG {
         var arena_allocator = std.heap.ArenaAllocator.init(allocator);
         const arena_alloc = arena_allocator.allocator();
 
         var chunks = try ChunkArray.initCapacity(arena_alloc, 3);
 
-        try chunks.append(arena_alloc, Chunk{ .IHDR = .{ .data = header } });
+        try chunks.append(arena_alloc, .{ .data = .{
+            .IHDR = header,
+        } });
 
         return PNG{
             .chunks = chunks,
@@ -37,8 +39,8 @@ pub const PNG = struct {
         };
     }
 
-    pub fn addChunk(self: *PNG, c: Chunk) !void {
-        try self.chunks.append(self.arena.allocator(), c);
+    pub fn addChunk(self: *PNG, c: Chunk.ChunkData) !void {
+        try self.chunks.append(self.arena.allocator(), Chunk.init(c));
 
         if (c == .IHDR) {
             _ = self.chunks.swapRemove(0);
@@ -50,29 +52,35 @@ pub const PNG = struct {
 
         var chunks = try self.allocator.alloc([]u8, self.chunks.items.len + 1);
         defer self.allocator.free(chunks);
+        @memset(chunks[0..], &.{});
 
         sortChunks(self.chunks.items);
 
-        var image_size: usize = 8 + 12;
+        var image_size: usize = 8 ;
         var chunks_added: usize = 0;
-        lop: for (self.chunks.items, 0..) |c, i| {
-            const buf: []u8 = switch (c) {
-                .IEND => |_| break :lop,
-                inline else => |v| try v.encode(arena_alloc),
-            };
+        for (self.chunks.items, 0..) |c, i| {
+            if (c.data == Chunk.ChunkType.IEND) {
+                break;
+            }
 
+            const buf = try c.encode(arena_alloc);
             chunks[i] = buf;
             chunks_added += 1;
             image_size += buf.len;
         }
 
-        const iend = Chunk{ .IEND = .{ .data = .{} } };
-        const iend_data = try iend.IEND.encode(arena_alloc);
+        const iend = Chunk{
+            .data = .{
+                .IEND = .{},
+            },
+        };
+        const iend_data = try iend.encode(arena_alloc);
         chunks[chunks_added] = iend_data;
         chunks_added += 1;
+        image_size += iend_data.len;
 
         var buf: []u8 = try arena_alloc.alloc(u8, image_size);
-        @memcpy(buf[0..8], PNG_SIGNATURE[0..]);
+        @memcpy(buf[0..8], PNG_SIGNATURE[0..8]);
 
         var offset: usize = 8;
         for (0..chunks_added) |i| {
@@ -110,13 +118,11 @@ pub const PNG = struct {
             cursor += c.len;
             const ch = Chunk.decode(c, ctx, png.arena.allocator()) catch continue;
 
-            if (ch == .IHDR) {
-                ctx.header = ch.IHDR.data;
+            if (ch.data == Chunk.ChunkType.IHDR) {
+                ctx.header = ch.data.IHDR;
             }
 
-            // std.debug.print("decoded chunk {any}\n", .{ch});
-
-            try png.addChunk(ch);
+            try png.addChunk(ch.data);
         }
 
         return png;
@@ -138,8 +144,8 @@ test "encode empty png" {
     });
     defer png.deinit();
 
-    try png.addChunk(Chunk{
-        .IEND = .init(.{}),
+    try png.addChunk(Chunk.ChunkData{
+        .IEND = .{},
     });
 
     const data = try png.encode();
@@ -207,18 +213,18 @@ test "only one IEND chunk" {
 
 test "chunk sort" {
     var chunks = [_]Chunk{
-        .{ .IHDR = .init(.{ .width = 32, .height = 32 }) },
-        .{ .IEND = .init(.{}) },
-        .{ .IDAT = .init(.{ .image_data = &[0]u8{} }) },
-        .{ .PLTE = .init(.{ .palette = &[0]color.Color{} }) },
+        .init(.{ .IHDR = .{ .width = 32, .height = 32 } }),
+        .init(.{ .IEND = .{} }),
+        .init(.{ .IDAT = .{ .image_data = &[0]u8{} } }),
+        .init(.{ .PLTE = .{ .palette = &[0]color.Color{} } }),
     };
 
     sortChunks(&chunks);
 
-    const expected_order = [_]chunk.ChunkType{ .IHDR, .PLTE, .IDAT, .IEND };
+    const expected_order = [_]Chunk.ChunkType{ .IHDR, .PLTE, .IDAT, .IEND };
 
     for (chunks, 0..) |c, i| {
-        const tag: chunk.ChunkType = std.meta.activeTag(c);
+        const tag: Chunk.ChunkType = std.meta.activeTag(c.data);
         try std.testing.expectEqual(tag, expected_order[i]);
     }
 }
@@ -231,17 +237,17 @@ test "decode png" {
     var png = try PNG.init(gpa, .{ .width = 9, .height = 9 });
     defer png.deinit();
 
-    try png.addChunk(Chunk{
-        .PLTE = .init(.{
+    try png.addChunk(Chunk.ChunkData{
+        .PLTE = .{
             .palette = &[_]color.Color{
                 .{ .r = 0xeb, .g = 0x4f, .b = 0x34 }, // 0: red-orange
                 .{ .r = 0x00, .g = 0x00, .b = 0x00 }, // 1: black
             },
-        }),
+        },
     });
 
-    try png.addChunk(Chunk{
-        .IDAT = .init(.{ //
+    try png.addChunk(Chunk.ChunkData{
+        .IDAT = .{ //
             .image_data = &[_]u8{
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 1, 1, 0, 0, 1, 1, 1, 0,
@@ -253,46 +259,46 @@ test "decode png" {
                 0, 0, 1, 1, 1, 0, 1, 1, 1, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             },
-        }),
+        },
     });
 
-    try png.addChunk(Chunk{
-        .tEXt = .init(.{ //
+    try png.addChunk(Chunk.ChunkData{
+        .tEXt = .{ //
             .keyword = "Title",
             .str = "rawr",
-        }),
+        },
     });
 
-    try png.addChunk(Chunk{
-        .tEXt = .init(.{ //
+    try png.addChunk(Chunk.ChunkData{
+        .tEXt = .{ //
             .keyword = "Author",
             .str = "Ben",
-        }),
+        },
     });
 
-    try png.addChunk(Chunk{
-        .tEXt = .init(.{ //
+    try png.addChunk(Chunk.ChunkData{
+        .tEXt = .{ //
             .keyword = "Software",
             .str = "colorpng",
-        }),
+        },
     });
 
     try png.addChunk(.{
-        .iTXt = .init(.{
+        .iTXt = .{
             .keyword = "Description",
             .language_tag = "en",
             .translated_keyword = "Description",
             .text = ":3c",
-        }),
+        },
     });
 
     try png.addChunk(.{
-        .iTXt = .init(.{
+        .iTXt = .{
             .keyword = "Description",
             .language_tag = "fr",
             .translated_keyword = "oui oui",
             .text = "baguette",
-        }),
+        },
     });
 
     const data = try png.encode();

@@ -3,11 +3,8 @@ const chunk = @import("../chunk.zig");
 
 const Allocator = std.mem.Allocator;
 const Chunk = chunk.Chunk;
-const PNGChunk = chunk.PNGChunk;
 const expectEqualSlices = std.testing.expectEqualSlices;
 const expectEqual = std.testing.expectEqual;
-
-pub const IHDR = PNGChunk(.{ 'I', 'H', 'D', 'R' }, IHDRData);
 
 pub const ColorType = enum(u8) {
     /// allowed bit depths: 1, 2, 4, 8, 16
@@ -72,8 +69,8 @@ pub const IHDRData = struct {
 };
 
 test "IHDR encode" {
-    var hdr = Chunk{
-        .IHDR = .init(.{ //
+    var hdr = Chunk.init(.{
+        .IHDR = .{ //
             .width = 16,
             .height = 16,
             .bit_depth = 8,
@@ -81,8 +78,8 @@ test "IHDR encode" {
             .compression_method = 0,
             .filter_method = 0,
             .interlace_method = 0,
-        }),
-    };
+        },
+    });
 
     const data = [_]u8{
         0, 0, 0, 13, // length
@@ -101,7 +98,7 @@ test "IHDR encode" {
     defer _ = dbg_alloc.deinit();
     var gpa = dbg_alloc.allocator();
 
-    const encoded_data = try hdr.IHDR.encode(gpa);
+    const encoded_data = try hdr.encode(gpa);
     defer gpa.free(encoded_data);
 
     try expectEqualSlices(u8, data[0..], encoded_data[0..]);
@@ -126,7 +123,7 @@ test "IHDR decode" {
     const gpa = dbg_alloc.allocator();
 
     const ihdr = try Chunk.decode(&data, .{}, gpa);
-    const ihdr_data = ihdr.IHDR.data;
+    const ihdr_data = ihdr.data.IHDR;
 
     try expectEqual(ihdr_data.width, 16);
     try expectEqual(ihdr_data.height, 16);

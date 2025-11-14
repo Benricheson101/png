@@ -3,11 +3,8 @@ const chunk = @import("../chunk.zig");
 
 const Allocator = std.mem.Allocator;
 const Chunk = chunk.Chunk;
-const PNGChunk = chunk.PNGChunk;
 const expectEqualSlices = std.testing.expectEqualSlices;
 const expectEqual = std.testing.expectEqual;
-
-pub const tIME = PNGChunk(.{ 't', 'I', 'M', 'E' }, tIMEData);
 
 pub const tIMEData = struct {
     year: u16,
@@ -43,16 +40,16 @@ pub const tIMEData = struct {
 };
 
 test "tIME encode" {
-    var time = Chunk{
-        .tIME = .init(.{
+    var time = Chunk.init(.{
+        .tIME = .{
             .year = 2025,
             .month = 11,
             .day = 13,
             .hour = 20,
             .minute = 28,
             .second = 31,
-        }),
-    };
+        },
+    });
 
     const data = [_]u8{
         0, 0, 0, 7, // length
@@ -73,7 +70,7 @@ test "tIME encode" {
     defer _ = dbg_alloc.deinit();
     const gpa = dbg_alloc.allocator();
 
-    const encoded_data = try time.tIME.encode(gpa);
+    const encoded_data = try time.encode(gpa);
     defer gpa.free(encoded_data);
 
     try expectEqualSlices(u8, data[0..], encoded_data[0..]);
@@ -100,7 +97,7 @@ test "tIME decode" {
     const gpa = dbg_alloc.allocator();
 
     const time_chunk = try Chunk.decode(&data, .{}, gpa);
-    const time_data = time_chunk.tIME.data;
+    const time_data = time_chunk.data.tIME;
 
     try expectEqual(time_data.year, 2025);
     try expectEqual(time_data.month, 11);

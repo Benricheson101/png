@@ -3,10 +3,7 @@ const chunk = @import("../chunk.zig");
 
 const Allocator = std.mem.Allocator;
 const Chunk = chunk.Chunk;
-const PNGChunk = chunk.PNGChunk;
 const expectEqualSlices = std.testing.expectEqualSlices;
-
-pub const tEXt = PNGChunk(.{ 't', 'E', 'X', 't' }, TEXTData);
 
 pub const TEXTData = struct {
     keyword: []const u8,
@@ -33,12 +30,12 @@ pub const TEXTData = struct {
 };
 
 test "tEXt encode" {
-    var text = Chunk{
-        .tEXt = .init(.{ //
+    var text = Chunk.init(.{
+        .tEXt = .{ //
             .keyword = "hi",
             .str = "hello",
-        }),
-    };
+        },
+    });
 
     const data = [_]u8{
         0, 0, 0, 8, // length
@@ -53,7 +50,7 @@ test "tEXt encode" {
     defer _ = dbg_alloc.deinit();
     const gpa = dbg_alloc.allocator();
 
-    const encoded_data = try text.tEXt.encode(gpa);
+    const encoded_data = try text.encode(gpa);
     defer gpa.free(encoded_data);
 
     try expectEqualSlices(u8, data[0..], encoded_data[0..]);
@@ -75,6 +72,6 @@ test "tEXt decode" {
 
     const text_chunk = try Chunk.decode(&data, .{}, gpa);
 
-    try expectEqualSlices(u8, &[_]u8{ 'h', 'i' }, text_chunk.tEXt.data.keyword);
-    try expectEqualSlices(u8, &[_]u8{ 'h', 'e', 'l', 'l', 'o' }, text_chunk.tEXt.data.str);
+    try expectEqualSlices(u8, &[_]u8{ 'h', 'i' }, text_chunk.data.tEXt.keyword);
+    try expectEqualSlices(u8, &[_]u8{ 'h', 'e', 'l', 'l', 'o' }, text_chunk.data.tEXt.str);
 }

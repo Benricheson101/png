@@ -20,16 +20,16 @@ pub fn main() !void {
     defer png.deinit();
 
     try png.addChunk(.{
-        .PLTE = .init(.{
+        .PLTE = .{
             .palette = &[_]Color{
                 .{ .r = 0xeb, .g = 0x4f, .b = 0x34 }, // 0: red-orange
                 .{ .r = 0x00, .g = 0x00, .b = 0x00 }, // 1: black
             },
-        }),
+        },
     });
 
     try png.addChunk(.{
-        .IDAT = .init(.{ //
+        .IDAT = .{ //
             .image_data = &[_]u8{
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 1, 1, 0, 0, 1, 1, 1, 0,
@@ -41,88 +41,88 @@ pub fn main() !void {
                 0, 0, 1, 1, 1, 0, 1, 1, 1, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             },
-        }),
+        },
     });
 
     try png.addChunk(.{
-        .tEXt = .init(.{ //
+        .tEXt = .{ //
             .keyword = "Title",
             .str = "rawr",
-        }),
+        },
     });
 
     try png.addChunk(.{
-        .tEXt = .init(.{ //
+        .tEXt = .{ //
             .keyword = "Author",
             .str = "Ben",
-        }),
+        },
     });
 
     try png.addChunk(.{
-        .tEXt = .init(.{ //
+        .tEXt = .{ //
             .keyword = "Software",
             .str = "coputer",
-        }),
+        },
     });
 
     try png.addChunk(.{
-        .iTXt = .init(.{
+        .iTXt = .{
             .keyword = "Description",
             .language_tag = "en",
             .translated_keyword = "Description",
             .text = ":3c",
-        }),
+        },
     });
 
     try png.addChunk(.{
-        .iTXt = .init(.{
+        .iTXt = .{
             .keyword = "Description",
             .language_tag = "fr",
             .translated_keyword = "oui oui",
             .text = "baguette",
-        }),
+        },
     });
 
     try png.addChunk(.{
-        .tRNS = .init(.{
+        .tRNS = .{
             .data = &[_]u8{ 255, 127 },
-        }),
+        },
     });
 
     try png.addChunk(.{
-        .sRGB = .init(.{
+        .sRGB = .{
             .intent = .relative_colorimetric,
-        }),
+        },
     });
 
     try png.addChunk(.{
-        .bKGD = .init(.{
+        .bKGD = .{
             .data = &[_]u8{1},
-        }),
+        },
     });
 
     try png.addChunk(.{
-        .tIME = .init(.{
+        .tIME = .{
             .year = 2025,
             .month = 11,
             .day = 13,
             .hour = 20,
             .minute = 28,
             .second = 31,
-        }),
+        },
     });
 
-    // const encoded = try png.encode();
-    //
-    // const decoded = try PNG.decode(allocator, encoded);
-    //
-    // try std.fs.cwd().writeFile(.{
-    //     .data = encoded[0..],
-    //     .sub_path = "output_image_test.png",
-    //     .flags = .{},
-    // });
-    //
-    // _ = decoded;
+    const encoded = try png.encode();
+
+    const decoded = try PNG.decode(allocator, encoded);
+
+    try std.fs.cwd().writeFile(.{
+        .data = encoded[0..],
+        .sub_path = "output_image_test.png",
+        .flags = .{},
+    });
+
+    _ = decoded;
 
     // const dir = try std.fs.openDirAbsolute("/Users/benricheson/Desktop", .{});
     // const file = try dir.openFile("owo.png", .{.mode = .read_only});
@@ -145,20 +145,20 @@ pub fn main() !void {
     });
 
     try owo.addChunk(.{
-        .PLTE = .init(.{
+        .PLTE = .{
             .palette = &[_]Color{
                 .{ .r = 0x9c, .g = 0xcc, .b = 0xfc },
                 .{ .r = 0x9c, .g = 0x9c, .b = 0xfc },
             },
-        }),
+        },
     });
 
-    try owo.addChunk(.{ .tRNS = .init(.{
+    try owo.addChunk(.{ .tRNS = .{
         .data = &[_]u8{ 64, 255 },
-    }) });
+    } });
 
     try owo.addChunk(.{
-        .IDAT = .init(.{ .image_data = &[_]u8{
+        .IDAT = .{ .image_data = &[_]u8{
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0,
             0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0,
@@ -168,7 +168,7 @@ pub fn main() !void {
             0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0,
             0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        } }),
+        } },
     });
 
     try std.fs.cwd().writeFile(.{

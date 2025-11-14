@@ -4,11 +4,8 @@ const Color = @import("../util/color.zig").Color;
 
 const Allocator = std.mem.Allocator;
 const Chunk = chunk.Chunk;
-const PNGChunk = chunk.PNGChunk;
 const expectEqualSlices = std.testing.expectEqualSlices;
 const expectEqual = std.testing.expectEqual;
-
-pub const PLTE = PNGChunk(.{ 'P', 'L', 'T', 'E' }, PLTEData);
 
 pub const PLTEData = struct {
     palette: []const Color,
@@ -49,14 +46,14 @@ pub const PLTEData = struct {
 };
 
 test "PLTE encode" {
-    var plte = Chunk{
-        .PLTE = .init(.{
+    var plte = Chunk.init(.{
+        .PLTE = .{
             .palette = &[_]Color{
                 .{ .r = 0xff, .g = 0x00, .b = 0xaa },
                 .{ .r = 0xcc, .g = 0xee, .b = 0x09 },
             },
-        }),
-    };
+        },
+    });
 
     const data = [_]u8{
         0, 0, 0, 6, // length
@@ -70,7 +67,7 @@ test "PLTE encode" {
     defer _ = dbg_alloc.deinit();
     const gpa = dbg_alloc.allocator();
 
-    const encoded_data = try plte.PLTE.encode(gpa);
+    const encoded_data = try plte.encode(gpa);
     defer gpa.free(encoded_data);
 
     try expectEqualSlices(u8, data[0..], encoded_data[0..]);
@@ -90,7 +87,7 @@ test "PLTE decode" {
     const gpa = dbg_alloc.allocator();
 
     const plte_chunk = try Chunk.decode(&data, .{}, gpa);
-    const palette = plte_chunk.PLTE.data.palette;
+    const palette = plte_chunk.data.PLTE.palette;
     defer gpa.free(palette);
 
     try expectEqual(Color{ .r = 0xff, .g = 0x00, .b = 0xaa }, palette[0]);

@@ -2,8 +2,6 @@ const std = @import("std");
 const chunk = @import("../chunk.zig");
 
 const Allocator = std.mem.Allocator;
-const Chunk = chunk.Chunk;
-const PNGChunk = chunk.PNGChunk;
 
 pub const SimpleChunkData = struct {
     data: []const u8,

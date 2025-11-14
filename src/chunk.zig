@@ -1,96 +1,27 @@
 const std = @import("std");
 
-pub const ihdr = @import("./chunks/IHDR.zig");
-pub const plte = @import("./chunks/PLTE.zig");
-pub const iend = @import("./chunks/IEND.zig");
-pub const idat = @import("./chunks/IDAT.zig");
-pub const text = @import("./chunks/tEXt.zig");
-pub const itxt = @import("./chunks/iTXt.zig");
-pub const trns = @import("./chunks/tRNS.zig");
-pub const srgb = @import("./chunks/sRGB.zig");
-pub const bkgd = @import("./chunks/bKGD.zig");
-pub const time = @import("./chunks/tIME.zig");
-
-// pub const simple_ancillary = @import("./chunks/simple.zig");
-
 const Allocator = std.mem.Allocator;
 const Crc32 = std.hash.Crc32;
 
 // order is important here!
-pub const ChunkType = enum(u8) {
-    IHDR,
-    // zTXt,
-    tEXt,
-    iTXt,
-    tIME,
-    // sPLT,
-    // pHYS,
-    sRGB,
-    // sBIT,
-    // iCCP,
-    // gAMA,
-    // cHRM,
-    PLTE,
-    tRNS,
-    // hIST,
-    bKGD,
-    IDAT,
-    IEND,
-};
+pub const Chunk = makeChunks(.{
+    .IHDR = .{ .data = @import("./chunks/IHDR.zig").IHDRData },
+    .tEXt = .{ .data = @import("./chunks/tEXt.zig").TEXTData },
+    .iTXt = .{ .data = @import("./chunks/iTXt.zig").ITXTData },
+    .tIME = .{ .data = @import("./chunks/tIME.zig").tIMEData },
+    .sRGB = .{ .data = @import("./chunks/sRGB.zig").SRGBData },
+    .PLTE = .{ .data = @import("./chunks/PLTE.zig").PLTEData },
+    .tRNS = .{ .data = @import("./chunks/tRNS.zig").tRNSData },
+    .bKGD = .{ .data = @import("./chunks/bKGD.zig").bKGDData },
+    .IDAT = .{ .data = @import("./chunks/IDAT.zig").IDATData },
+    .IEND = .{ .data = @import("./chunks/IEND.zig").IENDData },
+});
 
 pub const DecoderContext = struct {
-    header: ?ihdr.IHDRData = null,
+    header: ?@FieldType(Chunk.ChunkData, "IHDR") = null,
 };
 
 // TODO: can I somehow make a "CUSTOM" type in the enum that takes any type?
-pub const Chunk = union(ChunkType) {
-    IHDR: ihdr.IHDR,
-    tEXt: text.tEXt,
-    iTXt: itxt.iTXt,
-    tIME: time.tIME,
-    sRGB: srgb.sRGB,
-    PLTE: plte.PLTE,
-    tRNS: trns.tRNS,
-    bKGD: bkgd.bKGD,
-    IDAT: idat.IDAT,
-    IEND: iend.IEND,
-
-    pub fn decode(buf: []u8, ctx: DecoderContext, allocator: Allocator) !Chunk {
-        const len_bytes = buf[0..4];
-        const len = std.mem.readInt(u32, len_bytes, .big);
-
-        const typ = buf[4..8];
-        const data = buf[8 .. len + 8];
-        const crc_bytes = buf[len + 8 .. len + 12];
-        const crc = std.mem.readPackedInt(u32, crc_bytes, 0, .big);
-
-        const actual_crc = Crc32.hash(buf[4 .. len + 8]);
-        if (crc != actual_crc) {
-            return error.BadChecksum;
-        }
-
-        const thing = std.meta.stringToEnum(ChunkType, typ[0..]);
-        if (thing == null) {
-            return error.UnknownChunk;
-        }
-
-        return switch (thing.?) {
-            .IHDR => .{ .IHDR = try ihdr.IHDR.decode(data, ctx, allocator) },
-            .PLTE => .{ .PLTE = try plte.PLTE.decode(data, ctx, allocator) },
-            .IEND => .{ .IEND = try iend.IEND.decode(data, ctx, allocator) },
-            .IDAT => .{ .IDAT = try idat.IDAT.decode(data, ctx, allocator) },
-            .tEXt => .{ .tEXt = try text.tEXt.decode(data, ctx, allocator) },
-            .iTXt => .{ .iTXt = try itxt.iTXt.decode(data, ctx, allocator) },
-            .tRNS => .{ .tRNS = try trns.tRNS.decode(data, ctx, allocator) },
-            .sRGB => .{ .sRGB = try srgb.sRGB.decode(data, ctx, allocator) },
-            .bKGD => .{ .bKGD = try bkgd.bKGD.decode(data, ctx, allocator) },
-            .tIME => .{ .tIME = try time.tIME.decode(data, ctx, allocator) },
-            // else => return error.Unimplemented,
-        };
-    }
-
-    // TODO: deinit
-};
 
 /// A generic PNG chunk
 ///
@@ -98,29 +29,86 @@ pub const Chunk = union(ChunkType) {
 /// 4 bytes: chunk type
 /// ? bytes: data
 /// 4 bytes: crc32
-pub fn PNGChunk(comptime chunk_typ: [4]u8, comptime Data: type) type {
-    const BASE_CHUNK_SIZE: usize = 12;
+fn makeChunks(comptime chunks: anytype) type {
+    const fields = @typeInfo(@TypeOf(chunks)).@"struct".fields;
+
+    var enum_fields: [fields.len]std.builtin.Type.EnumField = undefined;
+    var chunk_data_union_fields: [fields.len]std.builtin.Type.UnionField = undefined;
+
+    inline for (fields, 0..) |f, i| {
+        var name: [f.name.len:0]u8 = undefined;
+        @memcpy(name[0..], f.name[0..]);
+
+        enum_fields[i] = .{
+            .name = &name,
+            .value = i,
+        };
+
+        const field_value = @field(chunks, f.name);
+        const Data = field_value.data;
+
+        chunk_data_union_fields[i] = .{
+            .name = &name,
+            .type = Data,
+            .alignment = @alignOf(Data),
+        };
+    }
+
+    const chunk_type_enum = @Type(.{ //
+        .@"enum" = .{
+            .tag_type = @Type(.{ .int = .{ .signedness = .unsigned, .bits = @ceil(@log2(@as(f32, fields.len))) } }),
+            .decls = &.{},
+            .is_exhaustive = true,
+            .fields = &enum_fields,
+        },
+    });
+
+    const chunk_data = @Type(.{ //
+        .@"union" = .{
+            .tag_type = chunk_type_enum,
+            .fields = &chunk_data_union_fields,
+            .decls = &.{},
+            .layout = .auto,
+        },
+    });
+
+    const chunk_type_map = std.StaticStringMap(chunk_type_enum).initComptime(blk: {
+        var field_name_map: [fields.len]struct { []const u8, chunk_type_enum } = undefined;
+        inline for (fields, 0..) |f, i| {
+            const name = f.name;
+            field_name_map[i] = .{ name, @enumFromInt(i) };
+        }
+
+        break :blk field_name_map;
+    });
 
     return struct {
-        pub const chunk_type = chunk_typ;
-        data: Data,
+        const BASE_CHUNK_SIZE: usize = 12;
 
         const Self = @This();
 
-        pub fn init(data: Data) Self {
+        pub const ChunkType = chunk_type_enum;
+        pub const ChunkData = chunk_data;
+
+        data: ChunkData,
+
+        pub fn init(data: ChunkData) Self {
             return Self{
                 .data = data,
             };
         }
 
         pub fn encode(self: *const Self, allocator: Allocator) ![]u8 {
-            const data: []u8 = try self.data.encode(allocator);
+            const data = switch (self.data) {
+                inline else => |v| try v.encode(allocator),
+            };
             defer allocator.free(data);
 
             const buf = try allocator.alloc(u8, data.len + BASE_CHUNK_SIZE);
             @memset(buf[0..], 0);
 
             std.mem.writeInt(u32, buf[0..4], @intCast(data.len), .big);
+            const chunk_typ = @tagName(self.data);
             @memcpy(buf[4..8], chunk_typ[0..4]);
 
             @memmove(buf[8 .. buf.len - 4], data[0..]);
@@ -132,9 +120,30 @@ pub fn PNGChunk(comptime chunk_typ: [4]u8, comptime Data: type) type {
         }
 
         pub fn decode(data: []u8, ctx: DecoderContext, allocator: Allocator) !Self {
-            return Self{
-                .data = try Data.decode(data, ctx, allocator),
-            };
+            const len_bytes = data[0..4];
+            const len = std.mem.readInt(u32, len_bytes, .big);
+
+            const chunk_type = chunk_type_map.get(data[4..8]) orelse return error.UnknownChunk;
+
+            const raw_chunk_data = data[8 .. len + 8];
+            const crc_bytes = data[len + 8 .. len + 12];
+            const crc = std.mem.readPackedInt(u32, crc_bytes, 0, .big);
+
+            const actual_crc = Crc32.hash(data[4 .. len + 8]);
+            if (crc != actual_crc) {
+                return error.BadChecksum;
+            }
+
+            inline for (@typeInfo(ChunkData).@"union".fields) |f| {
+                const tag = @field(ChunkType, f.name);
+                if (chunk_type == tag) {
+                    return Self{
+                        .data = @unionInit(ChunkData, f.name, try .decode(raw_chunk_data, ctx, allocator)),
+                    };
+                }
+            }
+
+            unreachable;
         }
     };
 }

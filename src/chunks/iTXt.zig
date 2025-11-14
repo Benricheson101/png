@@ -3,10 +3,7 @@ const chunk = @import("../chunk.zig");
 
 const Allocator = std.mem.Allocator;
 const Chunk = chunk.Chunk;
-const PNGChunk = chunk.PNGChunk;
 const expectEqualSlices = std.testing.expectEqualSlices;
-
-pub const iTXt = PNGChunk(.{ 'i', 'T', 'X', 't' }, ITXTData);
 
 pub const ITXTData = struct {
     keyword: []const u8,
@@ -82,16 +79,16 @@ pub const ITXTData = struct {
 };
 
 test "iTXt encode" {
-    var itxt = Chunk{
-        .iTXt = .init(.{ //
+    var itxt = Chunk.init(.{
+        .iTXt = .{ //
             .keyword = "hi",
             .compression_flag = 0,
             .compression_method = 0,
             .language_tag = "en-us",
             .translated_keyword = "hi",
             .text = "heyyy",
-        }),
-    };
+        },
+    });
 
     const data = [_]u8{
         0, 0, 0, 19, // length
@@ -112,7 +109,7 @@ test "iTXt encode" {
     defer _ = dbg_alloc.deinit();
     const gpa = dbg_alloc.allocator();
 
-    const encoded_data = try itxt.iTXt.encode(gpa);
+    const encoded_data = try itxt.encode(gpa);
     defer gpa.free(encoded_data);
 
     try expectEqualSlices(u8, data[0..], encoded_data[0..]);
@@ -140,8 +137,8 @@ test "iTXt decode" {
 
     const itxt_chunk = try Chunk.decode(&data, .{}, gpa);
 
-    try expectEqualSlices(u8, &[_]u8{ 'h', 'i' }, itxt_chunk.iTXt.data.keyword[0..]);
-    try expectEqualSlices(u8, &[_]u8{ 'e', 'n', '-', 'u', 's' }, itxt_chunk.iTXt.data.language_tag[0..]);
-    try expectEqualSlices(u8, &[_]u8{ 'h', 'i' }, itxt_chunk.iTXt.data.translated_keyword[0..]);
-    try expectEqualSlices(u8, &[_]u8{ 'h', 'e', 'y', 'y', 'y' }, itxt_chunk.iTXt.data.text[0..]);
+    try expectEqualSlices(u8, &[_]u8{ 'h', 'i' }, itxt_chunk.data.iTXt.keyword[0..]);
+    try expectEqualSlices(u8, &[_]u8{ 'e', 'n', '-', 'u', 's' }, itxt_chunk.data.iTXt.language_tag[0..]);
+    try expectEqualSlices(u8, &[_]u8{ 'h', 'i' }, itxt_chunk.data.iTXt.translated_keyword[0..]);
+    try expectEqualSlices(u8, &[_]u8{ 'h', 'e', 'y', 'y', 'y' }, itxt_chunk.data.iTXt.text[0..]);
 }

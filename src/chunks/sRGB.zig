@@ -3,9 +3,6 @@ const chunk = @import("../chunk.zig");
 
 const Allocator = std.mem.Allocator;
 const Chunk = chunk.Chunk;
-const PNGChunk = chunk.PNGChunk;
-
-pub const sRGB = PNGChunk("sRGB".*, SRGBData);
 
 pub const RenderingIntent = enum(u8) {
     /// Perceptual intent is for images preferring good adaptation to the output device gamut at the expense of colorimetric accuracy, like photographs.
@@ -36,9 +33,9 @@ pub const SRGBData = struct {
 };
 
 test "sRGB encode" {
-    var srgb = Chunk{
-        .sRGB = .init(.{ .intent = .relative_colorimetric }),
-    };
+    var srgb = Chunk.init(.{
+        .sRGB = .{ .intent = .relative_colorimetric },
+    });
 
     const data = [_]u8{
         0, 0, 0, 1, // length
@@ -51,7 +48,7 @@ test "sRGB encode" {
     defer _ = dbg_alloc.deinit();
     const gpa = dbg_alloc.allocator();
 
-    const encoded_data = try srgb.sRGB.encode(gpa);
+    const encoded_data = try srgb.encode(gpa);
     defer gpa.free(encoded_data);
 
     try std.testing.expectEqualSlices(u8, data[0..], encoded_data[0..]);
@@ -71,5 +68,5 @@ test "sRGB decode" {
 
     const srgb_chunk = try Chunk.decode(&data, .{}, gpa);
 
-    try std.testing.expectEqual(srgb_chunk.sRGB.data.intent, .relative_colorimetric);
+    try std.testing.expectEqual(srgb_chunk.data.sRGB.intent, .relative_colorimetric);
 }

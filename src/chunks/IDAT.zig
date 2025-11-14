@@ -3,14 +3,11 @@ const chunk = @import("../chunk.zig");
 
 const Allocator = std.mem.Allocator;
 const Chunk = chunk.Chunk;
-const PNGChunk = chunk.PNGChunk;
 const expectEqualSlices = std.testing.expectEqualSlices;
 
 const c = @cImport({
     @cInclude("zlib.h");
 });
-
-pub const IDAT = PNGChunk(.{ 'I', 'D', 'A', 'T' }, IDATData);
 
 pub const IDATData = struct {
     image_data: []const u8,
@@ -62,17 +59,17 @@ pub const IDATData = struct {
 };
 
 test "IDAT encode" {
-    var idat = Chunk{
-        .IDAT = .init(.{
+    var idat = Chunk.init(.{
+        .IDAT = .{
             .image_data = &[_]u8{ 0, 1, 2, 3, 4 },
-        }),
-    };
+        },
+    });
 
     var dbg_alloc = std.heap.DebugAllocator(.{}){};
     defer _ = dbg_alloc.deinit();
     const gpa = dbg_alloc.allocator();
 
-    const encoded_data = try idat.IDAT.encode(gpa);
+    const encoded_data = try idat.encode(gpa);
     defer gpa.free(encoded_data);
 
     try expectEqualSlices(u8, "IDAT"[0..4], encoded_data[4..8]);
@@ -99,7 +96,7 @@ test "IDAT decode" {
     const gpa = dbg_alloc.allocator();
 
     const idat_chunk = try Chunk.decode(&data, ctx, gpa);
-    defer gpa.free(idat_chunk.IDAT.data.image_data);
+    defer gpa.free(idat_chunk.data.IDAT.image_data);
 
     const expected_data = [_]u8{
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -113,5 +110,5 @@ test "IDAT decode" {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     };
 
-    try expectEqualSlices(u8, expected_data[0..], idat_chunk.IDAT.data.image_data[0..]);
+    try expectEqualSlices(u8, expected_data[0..], idat_chunk.data.IDAT.image_data[0..]);
 }
