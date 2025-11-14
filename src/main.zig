@@ -112,15 +112,70 @@ pub fn main() !void {
         }),
     });
 
-    const encoded = try png.encode();
+    // const encoded = try png.encode();
+    //
+    // const decoded = try PNG.decode(allocator, encoded);
+    //
+    // try std.fs.cwd().writeFile(.{
+    //     .data = encoded[0..],
+    //     .sub_path = "output_image_test.png",
+    //     .flags = .{},
+    // });
+    //
+    // _ = decoded;
 
-    const decoded = try PNG.decode(allocator, encoded);
+    // const dir = try std.fs.openDirAbsolute("/Users/benricheson/Desktop", .{});
+    // const file = try dir.openFile("owo.png", .{.mode = .read_only});
+    // const owo = try file.readToEndAlloc(allocator, 1e10);
+    //
+    // var owo_png = try PNG.decode(allocator, owo[0..]);
+    // const img_data = owo_png.chunks.items[2].PLTE.data.palette;
+    // std.debug.print("{any}\n", .{img_data});
+    //
+    // try std.fs.cwd().writeFile(.{
+    //     .data = (try owo_png.encode())[0..],
+    //     .sub_path = "output_image_test_2.png",
+    //     .flags = .{},
+    // });
 
-    try std.fs.cwd().writeFile(.{
-        .data = encoded[0..],
-        .sub_path = "output_image_test.png",
-        .flags = .{},
+    var owo = try PNG.init(allocator, .{
+        .width = 25,
+        .height = 9,
+        .color_type = .indexed,
     });
 
-    _ = decoded;
+    try owo.addChunk(.{
+        .PLTE = .init(.{
+            .palette = &[_]Color{
+                .{ .r = 0x9c, .g = 0xcc, .b = 0xfc },
+                .{ .r = 0x9c, .g = 0x9c, .b = 0xfc },
+            },
+        }),
+    });
+
+    try owo.addChunk(.{ .tRNS = .init(.{
+        .data = &[_]u8{ 64, 255 },
+    }) });
+
+    try owo.addChunk(.{
+        .IDAT = .init(.{ .image_data = &[_]u8{
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0,
+            0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0,
+            0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0,
+            0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0,
+            0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0,
+            0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0,
+            0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        } }),
+    });
+
+    try std.fs.cwd().writeFile(.{
+        .data = (try owo.encode())[0..],
+        .sub_path = "output_image_test_2.png",
+        .flags = .{},
+    });
 }
+
+// #E9F2FD
