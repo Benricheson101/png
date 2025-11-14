@@ -37,9 +37,7 @@ pub const SRGBData = struct {
 
 test "sRGB encode" {
     var srgb = Chunk{
-        .sRGB = .init(.{
-            .intent = .relative_colorimetric
-        }),
+        .sRGB = .init(.{ .intent = .relative_colorimetric }),
     };
 
     const data = [_]u8{

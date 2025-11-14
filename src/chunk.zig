@@ -9,6 +9,7 @@ pub const itxt = @import("./chunks/iTXt.zig");
 pub const trns = @import("./chunks/tRNS.zig");
 pub const srgb = @import("./chunks/sRGB.zig");
 pub const bkgd = @import("./chunks/bKGD.zig");
+pub const time = @import("./chunks/tIME.zig");
 
 // pub const simple_ancillary = @import("./chunks/simple.zig");
 
@@ -21,7 +22,7 @@ pub const ChunkType = enum(u8) {
     // zTXt,
     tEXt,
     iTXt,
-    // tIME,
+    tIME,
     // sPLT,
     // pHYS,
     sRGB,
@@ -46,6 +47,7 @@ pub const Chunk = union(ChunkType) {
     IHDR: ihdr.IHDR,
     tEXt: text.tEXt,
     iTXt: itxt.iTXt,
+    tIME: time.tIME,
     sRGB: srgb.sRGB,
     PLTE: plte.PLTE,
     tRNS: trns.tRNS,
@@ -82,6 +84,7 @@ pub const Chunk = union(ChunkType) {
             .tRNS => .{ .tRNS = try trns.tRNS.decode(data, ctx, allocator) },
             .sRGB => .{ .sRGB = try srgb.sRGB.decode(data, ctx, allocator) },
             .bKGD => .{ .bKGD = try bkgd.bKGD.decode(data, ctx, allocator) },
+            .tIME => .{ .tIME = try time.tIME.decode(data, ctx, allocator) },
             // else => return error.Unimplemented,
         };
     }
@@ -95,7 +98,6 @@ pub const Chunk = union(ChunkType) {
 /// 4 bytes: chunk type
 /// ? bytes: data
 /// 4 bytes: crc32
-
 pub fn PNGChunk(comptime chunk_typ: [4]u8, comptime Data: type) type {
     const BASE_CHUNK_SIZE: usize = 12;
 

@@ -85,7 +85,7 @@ pub fn main() !void {
 
     try png.addChunk(.{
         .tRNS = .init(.{
-            .data = &[_]u8{255, 127},
+            .data = &[_]u8{ 255, 127 },
         }),
     });
 
@@ -98,6 +98,17 @@ pub fn main() !void {
     try png.addChunk(.{
         .bKGD = .init(.{
             .data = &[_]u8{1},
+        }),
+    });
+
+    try png.addChunk(.{
+        .tIME = .init(.{
+            .year = 2025,
+            .month = 11,
+            .day = 13,
+            .hour = 20,
+            .minute = 28,
+            .second = 31,
         }),
     });
 
