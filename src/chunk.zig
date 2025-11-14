@@ -7,6 +7,7 @@ pub const idat = @import("./chunks/IDAT.zig");
 pub const text = @import("./chunks/tEXt.zig");
 pub const itxt = @import("./chunks/iTXt.zig");
 pub const trns = @import("./chunks/tRNS.zig");
+pub const srgb = @import("./chunks/sRGB.zig");
 
 // pub const simple_ancillary = @import("./chunks/simple.zig");
 
@@ -22,7 +23,7 @@ pub const ChunkType = enum(u8) {
     // tIME,
     // sPLT,
     // pHYS,
-    // sRGB,
+    sRGB,
     // sBIT,
     // iCCP,
     // gAMA,
@@ -44,6 +45,7 @@ pub const Chunk = union(ChunkType) {
     IHDR: ihdr.IHDR,
     tEXt: text.tEXt,
     iTXt: itxt.iTXt,
+    sRGB: srgb.sRGB,
     PLTE: plte.PLTE,
     tRNS: trns.tRNS,
     IDAT: idat.IDAT,
@@ -76,6 +78,7 @@ pub const Chunk = union(ChunkType) {
             .tEXt => .{ .tEXt = try text.tEXt.decode(data, ctx, allocator) },
             .iTXt => .{ .iTXt = try itxt.iTXt.decode(data, ctx, allocator) },
             .tRNS => .{ .tRNS = try trns.tRNS.decode(data, ctx, allocator) },
+            .sRGB => .{ .sRGB = try srgb.sRGB.decode(data, ctx, allocator) },
             // else => return error.Unimplemented,
         };
     }
